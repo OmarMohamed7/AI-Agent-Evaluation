@@ -81,3 +81,6 @@ def get_today_date() -> str:
     logging.info("using the date tool")
 
     return str(date.today())
+
+
+all_tools = [get_user_purchase_history, calculate_right_refund, issue_refund_ticket, get_today_date]
