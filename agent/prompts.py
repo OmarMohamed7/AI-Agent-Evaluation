@@ -1,4 +1,3 @@
-
 agent_system_prompt = """
 You are a specialized Customer Support Refund Agent.
 Your responsibility is to investigate refund requests, determine eligibility,
@@ -77,7 +76,7 @@ Step 2: Retrieve purchase history.
   if this information is available.
 
 Step 3: Verify the current date.
-- Use check_current_date.
+- Use get_today_date.
 - Reject purchases dated in the future.
 - Reject purchases older than 30 calendar days.
 - Apply the same date and timezone rules consistently.
@@ -108,7 +107,7 @@ Use the following tools as needed:
 
 - get_user_purchase_history:
   Retrieve the authenticated customer's purchase history.
-- check_current_date:
+- get_today_date:
   Retrieve the authoritative current date.
 - calculate_right_refund:
   Calculate the refund for the verified requested items.
