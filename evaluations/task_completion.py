@@ -1,3 +1,4 @@
+# Evaluates whether the agent completed the user's refund task and reached the correct outcome per policy.
 import sys
 from pathlib import Path
 from uuid import uuid4
@@ -62,6 +63,7 @@ metrics = [
         include_reason=True,
     ),
 ]
+
 
 @observe()
 def run_agent(

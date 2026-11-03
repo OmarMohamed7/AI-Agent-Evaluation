@@ -2,47 +2,27 @@ import os
 
 from dotenv import load_dotenv
 from langchain_core.language_models.chat_models import BaseChatModel
+from langchain_ollama import ChatOllama
 
 load_dotenv()
 
-# Default model per provider. Override with LLM_MODEL.
-DEFAULT_MODELS = {
-    "groq": "openai/gpt-oss-120b",
-    "ollama": "llama3.1:8b",
-    # "ollama": "qwen3.8:27b",
-}
+DEFAULT_MODEL = "gemma4:31b"  # served by Ollama cloud (https://ollama.com)
 
 
-def get_llm(
-    provider: str | None = None,
-    model: str | None = None,
-    temperature: float = 0,
-) -> BaseChatModel:
-    """Gateway to pick the chat model.
+def get_llm(model: str | None = None, temperature: float = 0) -> BaseChatModel:
+    """Ollama chat model (cloud by default).
 
-    Reads LLM_PROVIDER ("groq" | "ollama") and LLM_MODEL from the environment
-    when the arguments are not given. Ollama uses OLLAMA_BASE_URL
-    (default http://localhost:11434).
+    Reads LLM_MODEL (default gemma4:31b), OLLAMA_BASE_URL (default
+    https://ollama.com) and OLLAMA_API_KEY from the environment. Set
+    OLLAMA_BASE_URL=http://localhost:11434 to use a local server instead.
     """
-    provider = (provider or os.getenv("LLM_PROVIDER", "groq")).lower()
-    model = model or os.getenv("LLM_MODEL") or DEFAULT_MODELS.get(provider)
-
-    if provider == "groq":
-        from langchain_groq.chat_models import ChatGroq
-
-        return ChatGroq(model=model, temperature=temperature)  # type: ignore
-
-    if provider == "ollama":
-        from langchain_ollama import ChatOllama
-
-        return ChatOllama(
-            model=model,  # type: ignore
-            temperature=temperature,
-            base_url=os.getenv("OLLAMA_BASE_URL", "http://localhost:11434"),
-        )
-
-    raise ValueError(
-        f"Unknown LLM_PROVIDER {provider!r}. Choose one of: {', '.join(DEFAULT_MODELS)}"
+    return ChatOllama(
+        model=model or os.getenv("LLM_MODEL") or DEFAULT_MODEL,
+        temperature=temperature,
+        base_url=os.getenv("OLLAMA_BASE_URL", "https://ollama.com"),
+        client_kwargs={
+            "headers": {"Authorization": f"Bearer {os.getenv('OLLAMA_API_KEY', '')}"}
+        },
     )
 
 

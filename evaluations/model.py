@@ -1,14 +1,19 @@
+import os
+
+from dotenv import load_dotenv
 from deepeval.models import DeepEvalBaseLLM
 from pydantic import BaseModel
 
 from agent.models import get_llm
 
+load_dotenv()
+
 
 class GatewayEvalModel(DeepEvalBaseLLM):
     """Lets DeepEval metrics use the provider chosen by the LLM gateway as the judge."""
 
-    def __init__(self, provider: str | None = None, model: str | None = None):
-        self.llm = get_llm(provider, model)
+    def __init__(self, model: str | None = None):
+        self.llm = get_llm(model)
         self.model_name = getattr(self.llm, "model_name", None) or getattr(self.llm, "model", "judge")
         super().__init__(self.model_name)
 
@@ -29,4 +34,6 @@ class GatewayEvalModel(DeepEvalBaseLLM):
         return str(self.model_name)
 
 
-eval_model = GatewayEvalModel()
+# The judge can use a different model: set EVAL_LLM_MODEL.
+# Falls back to the agent's LLM_MODEL when unset.
+eval_model = GatewayEvalModel(model=os.getenv("EVAL_LLM_MODEL"))
