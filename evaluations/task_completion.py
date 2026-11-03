@@ -51,17 +51,22 @@ the refund policy and reaches the correct outcome for the customer's request:
    includes the amount when approved, and is professional, concise, and factual.
 """
 
+# Authenticated user for goldens that don't set additional_metadata["user_id"].
+DEFAULT_USER_ID = "2"
+
 metrics = [
     TaskCompletionMetric(
         threshold=0.8,
         model=eval_model,
-        #   task=SUCCESSFUL_TASK_DESCRIPTTION,
+        task=SUCCESSFUL_TASK_DESCRIPTTION,
         include_reason=True,
     ),
 ]
 
 @observe()
-def run_agent(user_input: str, expected_output: str | None = None) -> str:
+def run_agent(
+    user_input: str, expected_output: str | None = None, user_id: str = DEFAULT_USER_ID
+) -> str:
     """Run the agent and expose only the final answer text to the metrics."""
     result = agent.invoke(
         {"messages": [HumanMessage(content=user_input)]},
@@ -69,7 +74,7 @@ def run_agent(user_input: str, expected_output: str | None = None) -> str:
             "configurable": {"thread_id": str(uuid4())},
             "callbacks": [CallbackHandler()],
         },
-        context=AgentContext(user_id="2"),
+        context=AgentContext(user_id=user_id),
     )
     structured = result.get("structured_response")
     # Small models sometimes end with plain text instead of calling the Answer tool.
@@ -82,7 +87,11 @@ def run_agent(user_input: str, expected_output: str | None = None) -> str:
 
 for golden in dataset.evals_iterator(metrics=metrics):
     try:
-        run_agent(golden.input, golden.expected_output)
+        run_agent(
+            golden.input,
+            golden.expected_output,
+            (golden.additional_metadata or {}).get("user_id", DEFAULT_USER_ID),
+        )
     except Exception as e:
         print(
             f"Skipping golden, agent failed: {golden.input!r}\n  {type(e).__name__}: {e}"

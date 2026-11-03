@@ -22,3 +22,6 @@ class Answer(BaseModel):
 
 class PurchasItem(BaseModel):
     name: str = Field(description="Name of the item purchased")
+    quantity: int = Field(
+        default=1, ge=1, description="How many units of this item to refund"
+    )

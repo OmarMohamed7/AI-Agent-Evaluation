@@ -11,7 +11,7 @@ from datetime import date, datetime, timedelta, timezone
 REFUND_WINDOW_DAYS = 30
 
 # (user_id, items) pairs that already got a ticket, to block duplicates.
-_issued_tickets: set[tuple[int, frozenset[str]]] = set()
+_issued_tickets: set[tuple[int, frozenset[tuple[str, int]]]] = set()
 
 
 def purchase_history(user_id: str) -> dict | Error:
@@ -39,6 +39,21 @@ def purchase_history(user_id: str) -> dict | Error:
 def _requested_orders(user: dict, items: list[PurchasItem]) -> list[dict]:
     wanted = {item.name.lower() for item in items}
     return [p for p in DB.get_user_orders(user["Id"]) if p["name"].lower() in wanted]
+
+
+def _refund_amount(orders: list[dict], items: list[PurchasItem]) -> float:
+    """Refund = unit price x requested quantity, capped at the quantity bought."""
+    total = 0.0
+    for item in items:
+        remaining = item.quantity
+        matching = [p for p in orders if p["name"].lower() == item.name.lower()]
+        for p in sorted(matching, key=lambda o: o["date"], reverse=True):
+            take = min(remaining, p["quantity"])
+            total += float(p["price"]) * take
+            remaining -= take
+            if remaining <= 0:
+                break
+    return total
 
 
 @tool
@@ -72,9 +87,9 @@ def calculate_right_refund(
     if not user:
         return Error(error=f"User {user_id} not found")
 
-    total_refund = sum(p["total_price"] for p in _requested_orders(user, items))
-
-    return {"refund_amount": float(total_refund)}
+    return {
+        "refund_amount": _refund_amount(_requested_orders(user, items), items)
+    }
 
 
 @tool
@@ -107,9 +122,12 @@ def issue_refund_ticket(
             error=f"No matching purchase within the last {REFUND_WINDOW_DAYS} days"
         )
 
-    refund_amount = float(sum(p["total_price"] for p in eligible))
+    refund_amount = _refund_amount(eligible, items)
 
-    key = (user["Id"], frozenset(item.name.lower() for item in items))
+    key = (
+        user["Id"],
+        frozenset((item.name.lower(), item.quantity) for item in items),
+    )
     if key in _issued_tickets:
         return Error(error="A refund ticket was already issued for these items")
     _issued_tickets.add(key)
