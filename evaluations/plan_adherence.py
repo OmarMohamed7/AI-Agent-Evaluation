@@ -1,3 +1,4 @@
+# Evaluates whether the agent actually followed the plan it made, executing its steps in order without deviating.
 import sys
 from pathlib import Path
 from uuid import uuid4
