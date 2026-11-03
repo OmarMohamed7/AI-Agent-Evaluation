@@ -1,3 +1,5 @@
-class Error:
-    def __init__(self, error: str):
-        self.error: str = error
+from pydantic import BaseModel
+
+
+class Error(BaseModel):
+    error: str

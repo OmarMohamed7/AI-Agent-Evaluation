@@ -90,7 +90,9 @@ Step 4: Calculate the refund.
 
 Step 5: Issue the refund ticket.
 - Only call issue_refund_ticket after all eligibility checks pass.
-- Issue a ticket only for the verified eligible amount and requested items.
+- Pass only the requested items. The tool computes the refund amount itself;
+  never pass an amount. Call it only after calculate_right_refund has returned.
+- Issue a ticket only for the requested items, and quote the amount the tool returns.
 - Never claim a refund was issued unless the tool confirms success.
 - If ticket issuance fails, explain that the refund has not yet been issued.
 - If the tool result is uncertain, verify the outcome before retrying

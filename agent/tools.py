@@ -58,7 +58,7 @@ def get_user_purchase_history(runtime: ToolRuntime[AgentContext]) -> dict | Erro
 @tool
 def calculate_right_refund(
     items: list[PurchasItem], runtime: ToolRuntime[AgentContext]
-) -> str | Error:
+) -> dict | Error:
     """
     this tool takes a list of items wanted to be returned and will return
     how much the refund is for the current authenticated customer
@@ -74,16 +74,17 @@ def calculate_right_refund(
 
     total_refund = sum(p["total_price"] for p in _requested_orders(user, items))
 
-    return f"the value of refund is : {total_refund}"
+    return {"refund_amount": float(total_refund)}
 
 
 @tool
 def issue_refund_ticket(
-    items: list[PurchasItem], refund_amount: int, runtime: ToolRuntime[AgentContext]
-) -> str | Error:
+    items: list[PurchasItem], runtime: ToolRuntime[AgentContext]
+) -> dict | Error:
     """
     This tool will send a ticket to the right team to return the refund for
-    the current authenticated customer. The amount must match the verified refund.
+    the current authenticated customer. The refund amount is computed and
+    verified by the tool itself, so do not pass an amount.
     """
 
     user_id = runtime.context.user_id
@@ -93,9 +94,6 @@ def issue_refund_ticket(
 
     if not user:
         return Error(error=f"User {user_id} not found")
-
-    if refund_amount <= 0:
-        return Error(error="Refund amount must be positive")
 
     cutoff = datetime.now(timezone.utc) - timedelta(days=REFUND_WINDOW_DAYS)
     eligible = [
@@ -109,16 +107,14 @@ def issue_refund_ticket(
             error=f"No matching purchase within the last {REFUND_WINDOW_DAYS} days"
         )
 
-    verified_amount = sum(p["total_price"] for p in eligible)
-    if refund_amount != verified_amount:
-        return Error(error="Refund amount does not match the verified purchase amount")
+    refund_amount = float(sum(p["total_price"] for p in eligible))
 
     key = (user["Id"], frozenset(item.name.lower() for item in items))
     if key in _issued_tickets:
         return Error(error="A refund ticket was already issued for these items")
     _issued_tickets.add(key)
 
-    return f"a refund ticket has been issued successfully with the amout of {refund_amount}"
+    return {"status": "issued", "refund_amount": refund_amount}
 
 
 @tool

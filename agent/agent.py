@@ -5,6 +5,7 @@ from dotenv import load_dotenv
 
 load_dotenv()
 from langchain.agents import create_agent
+from langchain.agents.structured_output import ToolStrategy
 from agent.prompts import agent_system_prompt
 from agent.objects import AgentContext, Answer
 from langgraph.checkpoint.memory import InMemorySaver
@@ -15,7 +16,7 @@ agent = create_agent(
     model=llm,
     system_prompt=agent_system_prompt,
     tools=all_tools,
-    response_format=Answer,
+    response_format=ToolStrategy(Answer),
     context_schema=AgentContext,
     checkpointer=InMemorySaver(),
 )
@@ -30,7 +31,9 @@ def run_conversation(user_id: str):
     conversation = True
 
     while conversation:
-        response = agent.invoke({"messages": [question]}, config=configration, context=context)  # type: ignore
+        response = agent.invoke(
+            {"messages": [question]}, config=configration, context=context
+        )
 
         structured_response = response["structured_response"]
 
