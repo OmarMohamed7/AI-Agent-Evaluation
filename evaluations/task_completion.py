@@ -12,6 +12,7 @@ sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
 
 from agent.agent import agent
 from agent.objects import AgentContext
+from common import final_answer
 from datasets import dataset
 from model import eval_model
 
@@ -78,9 +79,7 @@ def run_agent(
         },
         context=AgentContext(user_id=user_id),
     )
-    structured = result.get("structured_response")
-    # Small models sometimes end with plain text instead of calling the Answer tool.
-    answer = structured.answer if structured else str(result["messages"][-1].content)
+    answer = final_answer(result)
     update_current_trace(
         input=user_input, output=answer, expected_output=expected_output
     )

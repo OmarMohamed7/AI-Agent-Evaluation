@@ -6,7 +6,8 @@ from langchain_ollama import ChatOllama
 
 load_dotenv()
 
-DEFAULT_MODEL = "gemma4:31b"  # served by Ollama cloud (https://ollama.com)
+# DEFAULT_MODEL = "gemma4:31b"  # served by Ollama cloud (https://ollama.com)
+DEFAULT_MODEL = "gpt-oss:20b"  # served by Ollama cloud (https://ollama.com)
 
 
 def get_llm(model: str | None = None, temperature: float = 0) -> BaseChatModel:
