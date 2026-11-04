@@ -46,8 +46,13 @@ db/
   seed.py        random users, products and orders
 evaluations/
   datasets.py          goldens (inputs, expected outputs, expected tools)
-  model.py             DeepEval judge model (also Ollama)
+  model.py             DeepEval judge model (also Ollama); retries and fixes malformed structured output
+  common.py            final_answer() helper shared by the scripts
+  evalall.py           runs every evaluation and prints a summary
   task_completion.py   TaskCompletionMetric
+  answer_correctness.py  GEval answer correctness vs expected output
+  tool_correctness.py  ToolCorrectnessMetric
+  argument_correctness.py  ArgumentCorrectnessMetric
   plan_quality.py      PlanQualityMetric
   plan_adherence.py    PlanAdherenceMetric
   step_effiiciency.py  StepEfficiencyMetric
@@ -84,10 +89,27 @@ Each file runs the same dataset against one metric:
 
 ```bash
 uv run python evaluations/task_completion.py
+uv run python evaluations/answer_correctness.py
+uv run python evaluations/tool_correctness.py
+uv run python evaluations/argument_correctness.py
 uv run python evaluations/plan_quality.py
 uv run python evaluations/plan_adherence.py
 uv run python evaluations/step_effiiciency.py
 ```
+
+Or run them all, one after another, with a summary at the end (pass names to
+run a subset):
+
+```bash
+uv run python evaluations/evalall.py
+uv run python evaluations/evalall.py plan_quality tool_correctness
+```
+
+`evalall.py` raises DeepEval's per-task timeout to 900s, because the default
+180s is too short for a slow judge model. Set
+`DEEPEVAL_PER_TASK_TIMEOUT_SECONDS_OVERRIDE` yourself when running a script
+directly. "ok" in the summary means the script finished, not that the metrics
+passed: read the tables above it.
 
 A golden can set the authenticated user with
 `additional_metadata={"user_id": "..."}` (default `"2"`).
@@ -102,6 +124,7 @@ flowchart LR
 
     subgraph OUT [Outcome]
         TC[Task Completion<br/>did it reach the right result?]
+        AN[Answer Correctness<br/>does the answer match the expected one?]
     end
 
     subgraph PLAN [Planning and execution]
@@ -110,7 +133,7 @@ flowchart LR
         SE[Step Efficiency<br/>no wasted steps?]
     end
 
-    subgraph TOOLS [Tool use - planned]
+    subgraph TOOLS [Tool use]
         TCR[Tool Correctness<br/>right tools called?]
         AC[Argument Correctness<br/>right arguments passed?]
     end
@@ -119,11 +142,16 @@ flowchart LR
 | Metric | Question it answers | Status |
 |---|---|---|
 | Task Completion | Did the agent complete the refund task and reach the correct outcome per policy? | `evaluations/task_completion.py` |
+| Answer Correctness | Does the final answer match the golden's `expected_output` in decision and key facts? (GEval) | `evaluations/answer_correctness.py` |
 | Plan Quality | Is the agent's plan logical, complete and suited to the request? | `evaluations/plan_quality.py` |
 | Plan Adherence | Did the agent follow the plan it made, in order, without deviating? | `evaluations/plan_adherence.py` |
 | Step Efficiency | Did it finish in as few, non-redundant steps as needed? | `evaluations/step_effiiciency.py` |
-| Tool Correctness | Did it call the right tools? Compared with `expected_tools` in the goldens. | planned |
-| Argument Correctness | Did it pass the right arguments to each tool (item names, quantity)? | planned |
+| Tool Correctness | Did it call the right tools? Compared with `expected_tools` in the goldens. | `evaluations/tool_correctness.py` |
+| Argument Correctness | Did it pass the right arguments to each tool (item names, quantity)? Only tools that take arguments are judged; tool outputs are shown to the judge so it can see where ids come from. | `evaluations/argument_correctness.py` |
+
+The agent's identity comes from the session (`AgentContext`), so goldens do not
+put "I am user N" in the message; the unknown-customer case sets
+`additional_metadata={"user_id": "999999"}` instead.
 
 Pass threshold for every metric is `0.8`. The judge is an LLM, so scores can
 be noisy: use a judge model that is stronger than, or different from, the agent
