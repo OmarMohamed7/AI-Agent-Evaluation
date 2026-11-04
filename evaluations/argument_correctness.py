@@ -44,8 +44,18 @@ def run_agent(user_input: str, user_id: str = DEFAULT_USER_ID) -> tuple[str, lis
     answer = final_answer(result)
 
     # Calls to tools that take arguments (this also skips the structured "Answer" tool).
+    # Tool outputs let the judge see where arguments such as order ids came from.
+    outputs = {
+        m.tool_call_id: str(m.content)
+        for m in result["messages"]
+        if getattr(m, "type", None) == "tool"
+    }
     tools_called = [
-        ToolCall(name=call["name"], input_parameters=call["args"])
+        ToolCall(
+            name=call["name"],
+            input_parameters=call["args"],
+            output=outputs.get(call["id"]),
+        )
         for message in result["messages"]
         for call in getattr(message, "tool_calls", None) or []
         if call["name"] in TOOLS_WITH_ARGS

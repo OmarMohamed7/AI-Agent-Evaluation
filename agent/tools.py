@@ -33,7 +33,7 @@ def purchase_history(user_id: str) -> dict | Error:
         for p in DB.get_user_orders(user["Id"])
     ]
 
-    return {"user": user["Name"], "purchases": purchases}
+    return {"user_id": user["Id"], "user": user["Name"], "purchases": purchases}
 
 
 def _requested_orders(user: dict, items: list[PurchasItem]) -> list[dict]:
@@ -60,6 +60,7 @@ def _refund_amount(orders: list[dict], items: list[PurchasItem]) -> float:
 def get_user_purchase_history(runtime: ToolRuntime[AgentContext]) -> dict | Error:
     """
     Returns the purchase history of the current authenticated customer.
+    The customer is identified by the authenticated session, so this takes no arguments.
     """
 
     user_id = runtime.context.user_id
