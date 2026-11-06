@@ -10,9 +10,6 @@ from datetime import date, datetime, timedelta, timezone
 
 REFUND_WINDOW_DAYS = 30
 
-# (user_id, items) pairs that already got a ticket, to block duplicates.
-_issued_tickets: set[tuple[int, frozenset[tuple[str, int]]]] = set()
-
 
 def purchase_history(user_id: str) -> dict | Error:
     user = DB.get_user(user_id)
@@ -41,19 +38,31 @@ def _requested_orders(user: dict, items: list[PurchasItem]) -> list[dict]:
     return [p for p in DB.get_user_orders(user["Id"]) if p["name"].lower() in wanted]
 
 
-def _refund_amount(orders: list[dict], items: list[PurchasItem]) -> float:
-    """Refund = unit price x requested quantity, capped at the quantity bought."""
-    total = 0.0
+def _allocate_refund(
+    orders: list[dict], items: list[PurchasItem]
+) -> list[tuple[int, str, float]]:
+    """Refund = unit price x requested quantity, capped at the quantity bought.
+
+    Returns one (order_id, item name, amount) line per purchase row consumed,
+    newest purchases first.
+    """
+    merged: dict[tuple[int, str], float] = {}
     for item in items:
         remaining = item.quantity
         matching = [p for p in orders if p["name"].lower() == item.name.lower()]
         for p in sorted(matching, key=lambda o: o["date"], reverse=True):
-            take = min(remaining, p["quantity"])
-            total += float(p["price"]) * take
-            remaining -= take
             if remaining <= 0:
                 break
-    return total
+            take = min(remaining, p["quantity"])
+            key = (p["order_id"], p["name"].lower())
+            amount = float(p["price"]) * take
+            merged[key] = merged.get(key, 0.0) + amount
+            remaining -= take
+    return [(oid, name, amt) for (oid, name), amt in merged.items()]
+
+
+def _refund_amount(orders: list[dict], items: list[PurchasItem]) -> float:
+    return sum(amount for _, _, amount in _allocate_refund(orders, items))
 
 
 @tool
@@ -123,15 +132,11 @@ def issue_refund_ticket(
             error=f"No matching purchase within the last {REFUND_WINDOW_DAYS} days"
         )
 
-    refund_amount = _refund_amount(eligible, items)
+    lines = _allocate_refund(eligible, items)
+    refund_amount = sum(amount for _, _, amount in lines)
 
-    key = (
-        user["Id"],
-        frozenset((item.name.lower(), item.quantity) for item in items),
-    )
-    if key in _issued_tickets:
+    if not DB.create_refund_tickets(user["Id"], lines):
         return Error(error="A refund ticket was already issued for these items")
-    _issued_tickets.add(key)
 
     return {"status": "issued", "refund_amount": refund_amount}
 
